@@ -1,7 +1,7 @@
 const API_URL="https://iiqcgmflllmquclpsutm.supabase.co/functions/v1/perhetreeni-api";
 const names={mina:"Minä",jenni:"Jenni",rianna:"Rianna"};
 let familyPin=sessionStorage.getItem("perhetreeni_pin")||"";
-let programs={},active="mina",mode="view",draft=null,workouts=[];
+let programs={},active="mina",mode="view",draft=null,workouts=[],cardioSessions=[];
 const view=document.getElementById("view");
 const loginView=document.getElementById("loginView");
 const appView=document.getElementById("appView");
@@ -41,13 +41,14 @@ async function api(action,payload={}){
 }
 document.getElementById("pinBtn").onclick=unlock;
 document.getElementById("pinInput").onkeydown=e=>{if(e.key==="Enter")unlock()};
-document.getElementById("lockBtn").onclick=()=>{familyPin="";sessionStorage.removeItem("perhetreeni_pin");programs={};workouts=[];showLogin()};
+document.getElementById("lockBtn").onclick=()=>{familyPin="";sessionStorage.removeItem("perhetreeni_pin");programs={};workouts=[];cardioSessions=[];showLogin()};
 document.querySelectorAll(".profile").forEach(btn=>btn.onclick=()=>{active=btn.dataset.id;mode="view";setActiveButton();render()});
 document.getElementById("editBtn").onclick=()=>{mode="edit";draft=JSON.parse(JSON.stringify(programs[active]));render()};
 document.getElementById("workoutBtn").onclick=()=>{mode="workout";render()};
 document.getElementById("historyBtn").onclick=async()=>{mode="history";view.innerHTML='<div class="card">Ladataan historiaa…</div>';await loadHistory();render()};
+document.getElementById("cardioBtn").onclick=async()=>{mode="cardio";view.innerHTML='<div class="card">Ladataan kardioita…</div>';await loadCardio();render()};
 
-function render(){if(mode==="edit")return renderEditor();if(mode==="workout")return renderWorkout();if(mode==="history")return renderHistory();renderProgram()}
+function render(){if(mode==="edit")return renderEditor();if(mode==="workout")return renderWorkout();if(mode==="history")return renderHistory();if(mode==="cardio")return renderCardio();renderProgram()}
 function renderProgram(){
   const p=programs[active];if(!p){view.innerHTML='<div class="card">Ohjelmaa ei löytynyt.</div>';return}
   const rows=(p.exercises||[]).length?p.exercises.map(e=>`<div class="exercise"><div class="name">${esc(e[0])}</div><div class="badges"><span class="badge">${esc(e[1])}</span>${e[2]?`<span class="badge load">${esc(e[2])}</span>`:""}</div></div>`).join(""):'<div class="empty">Ei vielä liikkeitä.</div>';
@@ -91,6 +92,100 @@ function renderHistory(){
   const rows=workouts.length?workouts.map(w=>{const entries=(w.entries||[]).map(e=>`<div class="history-entry">• ${esc(e.name)}: ${esc(e.load||"–")}${e.reps?" · "+esc(e.reps):""}</div>`).join("");return `<div class="history-item"><div class="history-user">${esc(names[w.profile_key]||w.profile_key)}</div><div class="history-date">${esc(w.workout_date)} · ${esc(w.title)}</div><div style="margin-top:7px">${entries||'<div class="muted">Ei kirjattuja liikkeitä.</div>'}</div>${w.notes?`<div class="muted" style="margin-top:7px">${esc(w.notes)}</div>`:""}</div>`}).join(""):'<div class="empty">Ei vielä tallennettuja treenejä.</div>';
   view.innerHTML=`<div class="card"><h2>📚 Yhteinen treenihistoria</h2>${rows}</div>`;
 }
+
+async function loadCardio(){
+  try{
+    const data=await api("listCardio");
+    cardioSessions=data.cardio||[];
+  }catch(e){
+    cardioSessions=[];
+    alert("Kardiohistoriaa ei saatu ladattua: "+e.message);
+  }
+}
+
+function paceText(distance,duration){
+  const d=Number(distance),m=Number(duration);
+  if(!d||!m||d<=0||m<=0)return "";
+  const pace=m/d;
+  const min=Math.floor(pace);
+  const sec=Math.round((pace-min)*60);
+  return min+":"+String(sec).padStart(2,"0")+" min/km";
+}
+
+function renderCardio(){
+  const today=new Date().toISOString().slice(0,10);
+  const recent=cardioSessions.length?cardioSessions.slice(0,12).map(c=>{
+    const p=paceText(c.distance_km,c.duration_minutes);
+    const details=[
+      c.distance_km!=null?Number(c.distance_km).toFixed(2)+" km":"",
+      c.duration_minutes!=null?c.duration_minutes+" min":"",
+      p,
+      c.avg_heart_rate!=null?"❤️ "+c.avg_heart_rate:""
+    ].filter(Boolean).join(" · ");
+    return `<div class="history-item">
+      <div class="history-user">${esc(names[c.profile_key]||c.profile_key)} · ${esc(c.activity_type)}</div>
+      <div class="history-date">${esc(c.session_date)}</div>
+      <div class="history-entry">${esc(details||"Ei mittaustietoja")}</div>
+      ${c.notes?`<div class="muted" style="margin-top:5px">${esc(c.notes)}</div>`:""}
+    </div>`;
+  }).join(""):'<div class="empty">Ei vielä kirjattuja kardioita tai lenkkejä.</div>';
+
+  view.innerHTML=`
+    <div class="card">
+      <h2>🏃 Kirjaa kardio / lenkki: ${esc(names[active])}</h2>
+      <div class="work-grid">
+        <select id="cardioType">
+          <option>Juoksu</option>
+          <option>Kävely</option>
+          <option>Pyöräily</option>
+          <option>Crosstrainer</option>
+          <option>Soutulaite</option>
+          <option>Portaat</option>
+          <option>Muu kardio</option>
+        </select>
+        <input id="cardioDate" type="date" value="${today}">
+        <input id="cardioDistance" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Matka km">
+        <input id="cardioDuration" type="number" inputmode="numeric" step="1" min="0" placeholder="Aika min">
+        <input id="cardioHr" type="number" inputmode="numeric" step="1" min="20" max="250" placeholder="Keskisyke">
+      </div>
+      <div id="pacePreview" class="muted" style="margin-top:8px"></div>
+      <textarea id="cardioNotes" placeholder="Huomiot"></textarea>
+      <button id="saveCardio" class="btn primary full">✅ Tallenna kardio</button>
+    </div>
+    <div class="card">
+      <h2>Viimeisimmät kardiot</h2>
+      ${recent}
+    </div>`;
+
+  const updatePace=()=>{
+    const p=paceText(document.getElementById("cardioDistance").value,document.getElementById("cardioDuration").value);
+    document.getElementById("pacePreview").textContent=p?"Keskivauhti: "+p:"";
+  };
+  document.getElementById("cardioDistance").oninput=updatePace;
+  document.getElementById("cardioDuration").oninput=updatePace;
+  document.getElementById("saveCardio").onclick=saveCardio;
+}
+
+async function saveCardio(){
+  const payload={
+    profile_key:active,
+    activity_type:document.getElementById("cardioType").value,
+    session_date:document.getElementById("cardioDate").value,
+    distance_km:document.getElementById("cardioDistance").value,
+    duration_minutes:document.getElementById("cardioDuration").value,
+    avg_heart_rate:document.getElementById("cardioHr").value,
+    notes:document.getElementById("cardioNotes").value
+  };
+  try{
+    await api("saveCardio",{cardio:payload});
+    await loadCardio();
+    setStatus(true,"Kardio tallennettu – näkyy kaikille");
+    renderCardio();
+  }catch(e){
+    alert("Kardion tallennus epäonnistui: "+e.message);
+  }
+}
+
 async function start(){
   if(!familyPin){showLogin();return}
   loginView.hidden=true;appView.hidden=false;
