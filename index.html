@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101318">
+<title>Perhetreeni</title>
+<style>
+:root{--bg:#0f1115;--card:#181c23;--card2:#212631;--text:#f5f7fb;--muted:#a7afbb;--accent:#4da3ff;--line:#2c333f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+main{max-width:760px;margin:auto;padding:22px 14px 80px}h1{margin:4px 0 4px;font-size:30px}.sub{color:var(--muted);margin-bottom:22px}
+.profiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px}
+.profile{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:16px;padding:16px 8px;font-weight:700;font-size:16px}
+.profile.active{border-color:var(--accent);background:#17283b}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin:10px 0}
+h2{font-size:20px;margin:0 0 12px}.exercise{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.exercise:first-of-type{border-top:0}.muted{color:var(--muted);font-size:13px}
+.badge{background:var(--card2);border-radius:999px;padding:6px 9px;color:#cbd3df;font-size:12px;white-space:nowrap}
+.notice{border:1px dashed #4a5668;background:#151922;border-radius:14px;padding:13px;color:#c3cad4;font-size:14px;line-height:1.45}
+</style>
+</head>
+<body>
+<main>
+<h1>💪 Perhetreeni</h1>
+<div class="sub">Minä · Jenni · Rianna</div>
+
+<div class="profiles">
+<button class="profile active" onclick="showUser('mina',this)">Minä</button>
+<button class="profile" onclick="showUser('jenni',this)">Jenni</button>
+<button class="profile" onclick="showUser('rianna',this)">Rianna</button>
+</div>
+
+<section id="mina">
+<div class="card">
+<h2>Minun koko kropan treeni</h2>
+<div class="exercise"><span>RDL</span><span class="badge">3 × 6–10</span></div>
+<div class="exercise"><span>Jalkaprässi</span><span class="badge">3 × 8–12</span></div>
+<div class="exercise"><span>Etureisiojennus</span><span class="badge">2 × 10–15</span></div>
+<div class="exercise"><span>KP-penkki</span><span class="badge">3 × 8–12</span></div>
+<div class="exercise"><span>Vinopenkki Smith</span><span class="badge">2 × 8–12</span></div>
+<div class="exercise"><span>Ristitalja rinnalle</span><span class="badge">2 × 12–15</span></div>
+<div class="exercise"><span>Leuat</span><span class="badge">3 sarjaa</span></div>
+<div class="exercise"><span>Soutu</span><span class="badge">3 × 8–12</span></div>
+<div class="exercise"><span>Ylätalja</span><span class="badge">2 × 10–12</span></div>
+<div class="exercise"><span>Vipari taljassa</span><span class="badge">2–3 × 12–15</span></div>
+<div class="exercise"><span>Face pull / takaolkapää</span><span class="badge">2–3 × 12–15</span></div>
+<div class="exercise"><span>Hauiskääntö käsipainoilla</span><span class="badge">2–3 × 8–12</span></div>
+<div class="exercise"><span>Vasarakääntö</span><span class="badge">2–3 × 10–15</span></div>
+</div>
+</section>
+
+<section id="jenni" hidden>
+<div class="card"><h2>Jennin treeniohjelma</h2><div class="muted">Lisätään Jennin oma ohjelma seuraavaksi.</div></div>
+</section>
+
+<section id="rianna" hidden>
+<div class="card"><h2>Riannan treeniohjelma</h2><div class="muted">Lisätään Riannan oma ohjelma seuraavaksi.</div></div>
+</section>
+
+<div class="notice">
+Tämä on sivuston ensimmäinen Git-versio. Seuraavaksi lisätään treenin kirjaus, painot/toistot ja yhteinen tietokanta, jotta kaikkien puhelimilla näkyvät samat treenit.
+</div>
+</main>
+<script>
+function showUser(id,btn){
+  ['mina','jenni','rianna'].forEach(x=>document.getElementById(x).hidden=x!==id);
+  document.querySelectorAll('.profile').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
