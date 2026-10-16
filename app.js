@@ -1,34 +1,16 @@
 const API_URL="https://iiqcgmflllmquclpsutm.supabase.co/functions/v1/perhetreeni-api";
-const CODE_KEY="perhetreeni_family_code";
 const names={mina:"Minä",jenni:"Jenni",rianna:"Rianna"};
-let familyCode=(localStorage.getItem(CODE_KEY)||"").trim().toUpperCase();
 let programs={},active="mina",mode="view",draft=null,workouts=[];
-const loginView=document.getElementById("loginView"),appView=document.getElementById("appView"),view=document.getElementById("view");
-
+const view=document.getElementById("view");
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 function setStatus(ok,text){document.getElementById("statusDot").classList.toggle("ok",ok);document.getElementById("statusText").textContent=text}
 function setActiveButton(){document.querySelectorAll(".profile").forEach(x=>x.classList.toggle("active",x.dataset.id===active))}
 async function api(action,payload={}){
-  const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:familyCode,action,...payload})});
+  const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})});
   let data={};try{data=await res.json()}catch{}
   if(!res.ok)throw new Error(data.error||"Yhteysvirhe");
   return data;
 }
-function showLogin(){appView.hidden=true;loginView.hidden=false;document.getElementById("familyCodeInput").value=familyCode}
-async function connect(){
-  const err=document.getElementById("loginError");
-  familyCode=(document.getElementById("familyCodeInput").value||familyCode).trim().toUpperCase();
-  if(!familyCode){err.textContent="Syötä perhekoodi.";return}
-  err.textContent="Yhdistetään…";
-  try{
-    const data=await api("getPrograms");localStorage.setItem(CODE_KEY,familyCode);programs={};
-    for(const p of data.programs)programs[p.profile_key]=p;
-    loginView.hidden=true;appView.hidden=false;setStatus(true,"Yhteinen tietokanta käytössä");mode="view";render();
-  }catch(e){localStorage.removeItem(CODE_KEY);err.textContent=e.message}
-}
-document.getElementById("connectBtn").onclick=connect;
-document.getElementById("familyCodeInput").onkeydown=e=>{if(e.key==="Enter")connect()};
-document.getElementById("codeBtn").onclick=()=>{localStorage.removeItem(CODE_KEY);familyCode="";showLogin()};
 document.querySelectorAll(".profile").forEach(btn=>btn.onclick=()=>{active=btn.dataset.id;mode="view";setActiveButton();render()});
 document.getElementById("editBtn").onclick=()=>{mode="edit";draft=JSON.parse(JSON.stringify(programs[active]));render()};
 document.getElementById("workoutBtn").onclick=()=>{mode="workout";render()};
@@ -79,9 +61,8 @@ function renderHistory(){
   view.innerHTML=`<div class="card"><h2>📚 Yhteinen treenihistoria</h2>${rows}</div>`;
 }
 async function start(){
-  if(!familyCode){showLogin();return}
-  loginView.hidden=true;appView.hidden=false;setStatus(false,"Yhdistetään…");
+  setStatus(false,"Yhdistetään yhteiseen tietokantaan…");
   try{const data=await api("getPrograms");programs={};for(const p of data.programs)programs[p.profile_key]=p;setStatus(true,"Yhteinen tietokanta käytössä");render()}
-  catch(e){localStorage.removeItem(CODE_KEY);familyCode="";showLogin();document.getElementById("loginError").textContent="Syötä perhekoodi uudelleen."}
+  catch(e){setStatus(false,"Tietokantayhteys ei onnistunut");view.innerHTML='<div class="card">Yhteysvirhe. Päivitä sivu hetken päästä.</div>'}
 }
 start();
