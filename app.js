@@ -1,7 +1,7 @@
 const API_URL="https://iiqcgmflllmquclpsutm.supabase.co/functions/v1/perhetreeni-api";
 const names={mina:"Minä",jenni:"Jenni",rianna:"Rianna"};
 let familyPin=sessionStorage.getItem("perhetreeni_pin")||"";
-let programs={},active="mina",mode="view",draft=null,workouts=[],cardioSessions=[];
+let programs={},active="mina",mode="view",draft=null,workouts=[],cardioSessions=[],progressWorkouts=[];
 const view=document.getElementById("view");
 const loginView=document.getElementById("loginView");
 const appView=document.getElementById("appView");
@@ -41,14 +41,15 @@ async function api(action,payload={}){
 }
 document.getElementById("pinBtn").onclick=unlock;
 document.getElementById("pinInput").onkeydown=e=>{if(e.key==="Enter")unlock()};
-document.getElementById("lockBtn").onclick=()=>{familyPin="";sessionStorage.removeItem("perhetreeni_pin");programs={};workouts=[];cardioSessions=[];showLogin()};
+document.getElementById("lockBtn").onclick=()=>{familyPin="";sessionStorage.removeItem("perhetreeni_pin");programs={};workouts=[];cardioSessions=[];progressWorkouts=[];showLogin()};
 document.querySelectorAll(".profile").forEach(btn=>btn.onclick=()=>{active=btn.dataset.id;mode="view";setActiveButton();render()});
 document.getElementById("editBtn").onclick=()=>{mode="edit";draft=JSON.parse(JSON.stringify(programs[active]));render()};
 document.getElementById("workoutBtn").onclick=()=>{mode="workout";render()};
 document.getElementById("historyBtn").onclick=async()=>{mode="history";view.innerHTML='<div class="card">Ladataan historiaa…</div>';await loadHistory();render()};
+document.getElementById("progressBtn").onclick=async()=>{mode="progress";view.innerHTML='<div class="card">Ladataan kehitystä…</div>';await loadProgress();render()};
 document.getElementById("cardioBtn").onclick=async()=>{mode="cardio";view.innerHTML='<div class="card">Ladataan kardioita…</div>';await loadCardio();render()};
 
-function render(){if(mode==="edit")return renderEditor();if(mode==="workout")return renderWorkout();if(mode==="history")return renderHistory();if(mode==="cardio")return renderCardio();renderProgram()}
+function render(){if(mode==="edit")return renderEditor();if(mode==="workout")return renderWorkout();if(mode==="history")return renderHistory();if(mode==="progress")return renderProgress();if(mode==="cardio")return renderCardio();renderProgram()}
 function renderProgram(){
   const p=programs[active];if(!p){view.innerHTML='<div class="card">Ohjelmaa ei löytynyt.</div>';return}
   const rows=(p.exercises||[]).length?p.exercises.map(e=>`<div class="exercise"><div class="name">${esc(e[0])}</div><div class="badges"><span class="badge">${esc(e[1])}</span>${e[2]?`<span class="badge load">${esc(e[2])}</span>`:""}</div></div>`).join(""):'<div class="empty">Ei vielä liikkeitä.</div>';
@@ -91,6 +92,119 @@ async function loadHistory(){try{const data=await api("listWorkouts");workouts=d
 function renderHistory(){
   const rows=workouts.length?workouts.map(w=>{const entries=(w.entries||[]).map(e=>`<div class="history-entry">• ${esc(e.name)}: ${esc(e.load||"–")}${e.reps?" · "+esc(e.reps):""}</div>`).join("");return `<div class="history-item"><div class="history-user">${esc(names[w.profile_key]||w.profile_key)}</div><div class="history-date">${esc(w.workout_date)} · ${esc(w.title)}</div><div style="margin-top:7px">${entries||'<div class="muted">Ei kirjattuja liikkeitä.</div>'}</div>${w.notes?`<div class="muted" style="margin-top:7px">${esc(w.notes)}</div>`:""}</div>`}).join(""):'<div class="empty">Ei vielä tallennettuja treenejä.</div>';
   view.innerHTML=`<div class="card"><h2>📚 Yhteinen treenihistoria</h2>${rows}</div>`;
+}
+
+
+async function loadProgress(){
+  try{
+    const data=await api("listProgress",{profile_key:active});
+    progressWorkouts=data.workouts||[];
+  }catch(e){
+    progressWorkouts=[];
+    alert("Kehitystietoja ei saatu ladattua: "+e.message);
+  }
+}
+
+function parseLoadKg(value){
+  const s=String(value||"").toLowerCase().replace(",",".");
+  let m=s.match(/\d+(?:\.\d+)?\s*[x×*]\s*(\d+(?:\.\d+)?)/);
+  if(m)return Number(m[1]);
+  m=s.match(/\+\s*(\d+(?:\.\d+)?)/);
+  if(m)return Number(m[1]);
+  m=s.match(/(\d+(?:\.\d+)?)/);
+  return m?Number(m[1]):null;
+}
+
+function exerciseNamesForProgress(){
+  const map=new Map();
+  for(const w of progressWorkouts){
+    for(const e of (w.entries||[])){
+      const name=String(e?.name||"").trim();
+      if(name && !map.has(name.toLowerCase()))map.set(name.toLowerCase(),name);
+    }
+  }
+  return [...map.values()].sort((a,b)=>a.localeCompare(b,"fi"));
+}
+
+function pointsForExercise(name){
+  const key=String(name||"").trim().toLowerCase();
+  const points=[];
+  for(const w of progressWorkouts){
+    for(const e of (w.entries||[])){
+      if(String(e?.name||"").trim().toLowerCase()!==key)continue;
+      const kg=parseLoadKg(e.load);
+      if(kg==null || !Number.isFinite(kg))continue;
+      points.push({date:w.workout_date,kg,raw:String(e.load||"")});
+    }
+  }
+  return points;
+}
+
+function renderProgress(){
+  const namesList=exerciseNamesForProgress();
+  if(!namesList.length){
+    view.innerHTML='<div class="card"><h2>📈 Kehitys</h2><div class="empty">Kehityskäyrä alkaa muodostua, kun tallennat ensimmäisiä treenejä kuormineen.</div></div>';
+    return;
+  }
+  const options=namesList.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  view.innerHTML=`
+    <div class="card">
+      <h2>📈 Kehitys: ${esc(names[active])}</h2>
+      <div class="muted" style="margin-bottom:6px">Valitse liike</div>
+      <select id="progressExercise">${options}</select>
+      <div id="progressStats"></div>
+      <div id="progressChart" class="chart-wrap"></div>
+      <div id="progressList"></div>
+    </div>`;
+  const select=document.getElementById("progressExercise");
+  select.onchange=()=>drawProgress(select.value);
+  drawProgress(select.value);
+}
+
+function drawProgress(exerciseName){
+  const pts=pointsForExercise(exerciseName);
+  const stats=document.getElementById("progressStats");
+  const chart=document.getElementById("progressChart");
+  const list=document.getElementById("progressList");
+
+  if(!pts.length){
+    stats.innerHTML="";
+    chart.innerHTML='<div class="empty">Tälle liikkeelle ei ole vielä numeerista kuormaa. Kirjaa esimerkiksi 80 kg.</div>';
+    list.innerHTML="";
+    return;
+  }
+
+  const first=pts[0].kg,last=pts[pts.length-1].kg,best=Math.max(...pts.map(p=>p.kg));
+  const change=last-first;
+  stats.innerHTML=`<div class="stats">
+    <div class="stat"><b>${last.toLocaleString("fi-FI")} kg</b><span>viimeisin</span></div>
+    <div class="stat"><b>${best.toLocaleString("fi-FI")} kg</b><span>paras</span></div>
+    <div class="stat"><b>${change>=0?"+":""}${change.toLocaleString("fi-FI")} kg</b><span>muutos</span></div>
+  </div>`;
+
+  const W=700,H=240,padL=44,padR=18,padT=20,padB=34;
+  const vals=pts.map(p=>p.kg);
+  let min=Math.min(...vals),max=Math.max(...vals);
+  if(min===max){min=Math.max(0,min-5);max=max+5}
+  const range=max-min || 1;
+  const x=i=>pts.length===1?(W-padR+padL)/2:padL+i*(W-padL-padR)/(pts.length-1);
+  const y=v=>padT+(max-v)*(H-padT-padB)/range;
+  const poly=pts.map((p,i)=>`${x(i)},${y(p.kg)}`).join(" ");
+  const dots=pts.map((p,i)=>`<circle cx="${x(i)}" cy="${y(p.kg)}" r="5" fill="currentColor"><title>${esc(p.date)} · ${esc(p.raw)}</title></circle>`).join("");
+  const yLabels=[max,(max+min)/2,min].map(v=>{
+    const yy=y(v);
+    return `<text x="6" y="${yy+4}" font-size="12" fill="#a7afbb">${v.toFixed(v%1?1:0)}</text><line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="#2c333f" stroke-width="1"/>`;
+  }).join("");
+  const firstDate=pts[0].date,lastDate=pts[pts.length-1].date;
+  chart.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Kuorman kehitys liikkeessä ${esc(exerciseName)}" style="color:#4da3ff">
+    ${yLabels}
+    <polyline points="${poly}" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+    <text x="${padL}" y="${H-10}" font-size="12" fill="#a7afbb">${esc(firstDate)}</text>
+    <text x="${W-padR}" y="${H-10}" text-anchor="end" font-size="12" fill="#a7afbb">${esc(lastDate)}</text>
+  </svg>`;
+
+  list.innerHTML='<div style="margin-top:8px">'+pts.slice().reverse().slice(0,10).map(p=>`<div class="history-item"><div class="history-date">${esc(p.date)}</div><div class="history-entry"><b>${p.kg.toLocaleString("fi-FI")} kg</b> · ${esc(p.raw)}</div></div>`).join("")+'</div>';
 }
 
 async function loadCardio(){
