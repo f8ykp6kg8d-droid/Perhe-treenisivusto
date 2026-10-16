@@ -1,16 +1,47 @@
 const API_URL="https://iiqcgmflllmquclpsutm.supabase.co/functions/v1/perhetreeni-api";
 const names={mina:"Minä",jenni:"Jenni",rianna:"Rianna"};
+let familyPin=sessionStorage.getItem("perhetreeni_pin")||"";
 let programs={},active="mina",mode="view",draft=null,workouts=[];
 const view=document.getElementById("view");
+const loginView=document.getElementById("loginView");
+const appView=document.getElementById("appView");
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 function setStatus(ok,text){document.getElementById("statusDot").classList.toggle("ok",ok);document.getElementById("statusText").textContent=text}
 function setActiveButton(){document.querySelectorAll(".profile").forEach(x=>x.classList.toggle("active",x.dataset.id===active))}
+function showLogin(msg=""){
+  appView.hidden=true;
+  loginView.hidden=false;
+  document.getElementById("pinInput").value="";
+  document.getElementById("pinError").textContent=msg;
+  setTimeout(()=>document.getElementById("pinInput").focus(),50);
+}
+async function unlock(){
+  const input=document.getElementById("pinInput");
+  const err=document.getElementById("pinError");
+  familyPin=(input.value||"").trim();
+  if(!familyPin){err.textContent="Syötä PIN.";return}
+  err.textContent="Tarkistetaan…";
+  try{
+    const data=await api("getPrograms");
+    programs={};for(const p of data.programs)programs[p.profile_key]=p;
+    sessionStorage.setItem("perhetreeni_pin",familyPin);
+    loginView.hidden=true;appView.hidden=false;
+    setStatus(true,"Yhteinen tietokanta käytössä");
+    mode="view";render();
+  }catch(e){
+    familyPin="";sessionStorage.removeItem("perhetreeni_pin");
+    err.textContent=e.message;
+  }
+}
 async function api(action,payload={}){
-  const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})});
+  const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:familyPin,action,...payload})});
   let data={};try{data=await res.json()}catch{}
   if(!res.ok)throw new Error(data.error||"Yhteysvirhe");
   return data;
 }
+document.getElementById("pinBtn").onclick=unlock;
+document.getElementById("pinInput").onkeydown=e=>{if(e.key==="Enter")unlock()};
+document.getElementById("lockBtn").onclick=()=>{familyPin="";sessionStorage.removeItem("perhetreeni_pin");programs={};workouts=[];showLogin()};
 document.querySelectorAll(".profile").forEach(btn=>btn.onclick=()=>{active=btn.dataset.id;mode="view";setActiveButton();render()});
 document.getElementById("editBtn").onclick=()=>{mode="edit";draft=JSON.parse(JSON.stringify(programs[active]));render()};
 document.getElementById("workoutBtn").onclick=()=>{mode="workout";render()};
@@ -61,8 +92,16 @@ function renderHistory(){
   view.innerHTML=`<div class="card"><h2>📚 Yhteinen treenihistoria</h2>${rows}</div>`;
 }
 async function start(){
+  if(!familyPin){showLogin();return}
+  loginView.hidden=true;appView.hidden=false;
   setStatus(false,"Yhdistetään yhteiseen tietokantaan…");
-  try{const data=await api("getPrograms");programs={};for(const p of data.programs)programs[p.profile_key]=p;setStatus(true,"Yhteinen tietokanta käytössä");render()}
-  catch(e){setStatus(false,"Tietokantayhteys ei onnistunut");view.innerHTML='<div class="card">Yhteysvirhe. Päivitä sivu hetken päästä.</div>'}
+  try{
+    const data=await api("getPrograms");
+    programs={};for(const p of data.programs)programs[p.profile_key]=p;
+    setStatus(true,"Yhteinen tietokanta käytössä");render();
+  }catch(e){
+    familyPin="";sessionStorage.removeItem("perhetreeni_pin");
+    showLogin("PIN pitää syöttää uudelleen.");
+  }
 }
 start();
