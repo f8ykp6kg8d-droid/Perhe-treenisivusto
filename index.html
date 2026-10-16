@@ -24,9 +24,9 @@ h2{font-size:20px;margin:0 0 12px}
 .exercise{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
 .exercise:first-of-type{border-top:0}
 .name{font-weight:700}.muted{color:var(--muted);font-size:13px}
-.badge{background:var(--card2);border-radius:999px;padding:6px 9px;color:#cbd3df;font-size:12px;white-space:nowrap}
+.badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.badge{background:var(--card2);border-radius:999px;padding:6px 9px;color:#cbd3df;font-size:12px;white-space:nowrap}.load{background:#17304a;color:#bdddff}
 .editor-row{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px;margin:9px 0}
-.editor-grid{display:grid;grid-template-columns:1fr 120px;gap:8px}
+.editor-grid{display:grid;grid-template-columns:1fr 120px 120px;gap:8px}
 input{width:100%;background:#151922;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px}
 .row-actions{display:flex;gap:6px;margin-top:8px}
 .row-actions button{flex:1;padding:8px;border-radius:10px;border:1px solid var(--line);background:#151922;color:var(--text)}
@@ -63,10 +63,10 @@ const defaults={
   mina:{
     title:"Minun koko kropan treeni",
     exercises:[
-      ["RDL","3 × 6–10"],["Jalkaprässi","3 × 8–12"],["Etureisiojennus","2 × 10–15"],
-      ["KP-penkki","3 × 8–12"],["Vinopenkki Smith","2 × 8–12"],["Ristitalja rinnalle","2 × 12–15"],
-      ["Leuat","3 sarjaa"],["Soutu","3 × 8–12"],["Ylätalja","2 × 10–12"],["Vipari taljassa","2–3 × 12–15"],
-      ["Face pull / takaolkapää","2–3 × 12–15"],["Hauiskääntö käsipainoilla","2–3 × 8–12"],["Vasarakääntö","2–3 × 10–15"]
+      ["RDL","3 × 6–10",""],["Jalkaprässi","3 × 8–12",""],["Etureisiojennus","2 × 10–15",""],
+      ["KP-penkki","3 × 8–12",""],["Vinopenkki Smith","2 × 8–12",""],["Ristitalja rinnalle","2 × 12–15",""],
+      ["Leuat","3 sarjaa","oma paino"],["Soutu","3 × 8–12",""],["Ylätalja","2 × 10–12",""],["Vipari taljassa","2–3 × 12–15",""],
+      ["Face pull / takaolkapää","2–3 × 12–15",""],["Hauiskääntö käsipainoilla","2–3 × 8–12",""],["Vasarakääntö","2–3 × 10–15",""]
     ]
   },
   jenni:{title:"Jennin treeniohjelma",exercises:[]},
@@ -122,7 +122,7 @@ function render(){
   const rows=p.exercises.length?p.exercises.map(e=>`
     <div class="exercise">
       <div><div class="name">${esc(e[0])}</div></div>
-      <div class="badge">${esc(e[1])}</div>
+      <div class="badges"><div class="badge">${esc(e[1])}</div>${e[2]?`<div class="badge load">${esc(e[2])}</div>`:""}</div>
     </div>`).join(""):`<div class="empty">Ei vielä liikkeitä. Paina “Muokkaa ohjelmaa” ja lisää ensimmäinen liike.</div>`;
   v.innerHTML=`<div class="card"><h2>${esc(p.title)}</h2>${rows}</div>`;
 }
@@ -140,7 +140,7 @@ function renderEditor(v){
       <button class="btn" style="width:100%;margin-top:8px" id="cancelEdit">Peruuta</button>
     </div>`;
   document.getElementById("titleInput").addEventListener("input",e=>draft.title=e.target.value);
-  document.getElementById("addEx").addEventListener("click",()=>{draft.exercises.push(["Uusi liike","3 × 10"]);render()});
+  document.getElementById("addEx").addEventListener("click",()=>{draft.exercises.push(["Uusi liike","3 × 10",""]);render()});
   document.getElementById("cancelEdit").addEventListener("click",()=>{editing=false;render()});
   const rows=document.getElementById("editorRows");
   p.exercises.forEach((e,i)=>{
@@ -149,7 +149,7 @@ function renderEditor(v){
     row.innerHTML=`
       <div class="editor-grid">
         <input class="exname" value="${esc(e[0])}" placeholder="Liike">
-        <input class="exsets" value="${esc(e[1])}" placeholder="esim. 3 × 10">
+        <input class="exsets" value="${esc(e[1])}" placeholder="esim. 3 × 10"><input class="exload" value="${esc(e[2]||"")}" placeholder="Kuorma, esim. 80 kg">
       </div>
       <div class="row-actions">
         <button class="up">↑ Ylös</button>
@@ -157,7 +157,7 @@ function renderEditor(v){
         <button class="del">Poista</button>
       </div>`;
     row.querySelector(".exname").addEventListener("input",ev=>draft.exercises[i][0]=ev.target.value);
-    row.querySelector(".exsets").addEventListener("input",ev=>draft.exercises[i][1]=ev.target.value);
+    row.querySelector(".exsets").addEventListener("input",ev=>draft.exercises[i][1]=ev.target.value);row.querySelector(".exload").addEventListener("input",ev=>draft.exercises[i][2]=ev.target.value);
     row.querySelector(".up").addEventListener("click",()=>move(i,-1));
     row.querySelector(".down").addEventListener("click",()=>move(i,1));
     row.querySelector(".del").addEventListener("click",()=>{draft.exercises.splice(i,1);render()});
